@@ -20,11 +20,11 @@ See the [LICENSE](LICENSE) file for terms.
 
 ## Why This Exists
 
-Chrome's [Immersive Web Emulator](https://chromewebstore.google.com/detail/immersive-web-emulator/cgffilbpcibhmcfbgggfhfolhkfbhmik) extension (also built by Meta, the same team behind IWER) is the standard way to develop WebXR on desktop. However:
+Chrome's [Immersive Web Emulator](https://chromewebstore.google.com/detail/immersive-web-emulator/cgffilbpcibhmcfbgggfhfolhkfbhmik) Extension (also built by Meta, the same team behind IWER) is the standard way to develop WebXR on desktop. However:
 
 - **Corporate environments often disable browser extensions** via admin policies, leaving you with no XR emulator at all.
-- **The extension runs inside DevTools**, which takes screen space away from the actual 3D scene, painful on small laptop screens.
-- **The chrome extension does not support walking** (Shift + WASD locomotion). IWER does, and XR View inherits that since it uses the same underlying runtime.
+- **The Chrome extension runs inside DevTools**, which takes screen space away from the actual 3D scene, painful on small laptop screens.
+- **The Chrome extension does not support walking** (Shift + WASD locomotion). IWER does, and XR View inherits that since it uses the same underlying runtime.
 
 XR View solves all three: it's a standalone app that needs no extensions, renders the XR controls in the same window as the content, and supports full walk-mode emulation out of the box.
 

@@ -16,6 +16,12 @@ struct BrowserWebview(pub tauri::webview::Webview);
 unsafe impl Send for BrowserWebview {}
 unsafe impl Sync for BrowserWebview {}
 
+/// Holds the toolbar webview handle for resizing.
+struct ToolbarWebview(pub tauri::webview::Webview);
+
+unsafe impl Send for ToolbarWebview {}
+unsafe impl Sync for ToolbarWebview {}
+
 // ── Tauri commands ────────────────────────────────────────────────────────────
 
 #[tauri::command]
@@ -68,16 +74,57 @@ async fn reload(state: tauri::State<'_, Mutex<Option<BrowserWebview>>>) -> Resul
 #[tauri::command]
 async fn get_page_title(
     state: tauri::State<'_, Mutex<Option<BrowserWebview>>>,
-) -> Result<String, String> {
+) -> Result<(), String> {
     let guard = state.lock().unwrap();
     if let Some(bv) = guard.as_ref() {
-        // Eval returns nothing directly; use a navigation intercept to get the title.
-        // Instead, we eval a script that navigates to xrview.internal with the title.
         bv.0.eval(
             "window.location.href='http://xrview.internal/page-title?t='+encodeURIComponent(document.title||'')"
         ).map_err(|e| e.to_string())?;
     }
-    Ok(String::new())
+    Ok(())
+}
+
+#[tauri::command]
+async fn set_toolbar_expanded(
+    expanded: bool,
+    app: tauri::AppHandle,
+) -> Result<(), String> {
+    let toolbar = app.state::<ToolbarWebview>();
+    let browser = app.state::<Mutex<Option<BrowserWebview>>>();
+    let win = app.get_window("main").ok_or("window not found")?;
+    let scale = win.scale_factor().unwrap_or(1.0);
+    let phys = win.inner_size().map_err(|e| e.to_string())?;
+    let lw = phys.width as f64 / scale;
+    let lh = phys.height as f64 / scale;
+
+    if expanded {
+        // Toolbar takes full window, browser is hidden (zero height)
+        toolbar.0.set_bounds(Rect {
+            position: Position::Logical(LogicalPosition::new(0.0, 0.0)),
+            size: Size::Logical(LogicalSize::new(lw, lh)),
+        }).map_err(|e| e.to_string())?;
+        let guard = browser.lock().unwrap();
+        if let Some(bv) = guard.as_ref() {
+            bv.0.set_bounds(Rect {
+                position: Position::Logical(LogicalPosition::new(0.0, lh)),
+                size: Size::Logical(LogicalSize::new(lw, 0.0)),
+            }).map_err(|e| e.to_string())?;
+        }
+    } else {
+        // Restore normal layout
+        toolbar.0.set_bounds(Rect {
+            position: Position::Logical(LogicalPosition::new(0.0, 0.0)),
+            size: Size::Logical(LogicalSize::new(lw, TOOLBAR_HEIGHT)),
+        }).map_err(|e| e.to_string())?;
+        let guard = browser.lock().unwrap();
+        if let Some(bv) = guard.as_ref() {
+            bv.0.set_bounds(Rect {
+                position: Position::Logical(LogicalPosition::new(0.0, TOOLBAR_HEIGHT)),
+                size: Size::Logical(LogicalSize::new(lw, lh - TOOLBAR_HEIGHT)),
+            }).map_err(|e| e.to_string())?;
+        }
+    }
+    Ok(())
 }
 
 #[derive(serde::Deserialize)]
@@ -117,94 +164,6 @@ async fn show_bookmark_menu(
         let _ = menu.popup(window);
     })
     .map_err(|e| e.to_string())?;
-    Ok(())
-}
-
-#[tauri::command]
-async fn show_bookmark_editor(
-    id: String,
-    label: String,
-    url: String,
-    state: tauri::State<'_, Mutex<Option<BrowserWebview>>>,
-) -> Result<(), String> {
-    let escape_js = |s: &str| -> String {
-        let mut out = String::with_capacity(s.len() + 2);
-        out.push('\'');
-        for ch in s.chars() {
-            match ch {
-                '\\' => out.push_str("\\\\"),
-                '\'' => out.push_str("\\'"),
-                '\n' => out.push_str("\\n"),
-                '\r' => {}
-                _ => out.push(ch),
-            }
-        }
-        out.push('\'');
-        out
-    };
-
-    let mode = if id.is_empty() { "add" } else { "edit" };
-
-    let script = format!(
-        "{}\n{}",
-        include_str!("../overlays/shared.js"),
-        include_str!("../overlays/bookmark-edit.js")
-            .replace("__BM_MODE__", &escape_js(mode))
-            .replace("__BM_ID__", &escape_js(&id))
-            .replace("__BM_LABEL__", &escape_js(&label))
-            .replace("__BM_URL__", &escape_js(&url))
-    );
-
-    let guard = state.lock().unwrap();
-    if let Some(bv) = guard.as_ref() {
-        bv.0.eval(&script).map_err(|e| e.to_string())?;
-    }
-    Ok(())
-}
-
-#[tauri::command]
-async fn show_help(state: tauri::State<'_, Mutex<Option<BrowserWebview>>>) -> Result<(), String> {
-    let script = format!(
-        "{}\n{}",
-        include_str!("../overlays/shared.js"),
-        include_str!("../overlays/help.js")
-    );
-    let guard = state.lock().unwrap();
-    if let Some(bv) = guard.as_ref() {
-        bv.0.eval(&script).map_err(|e| e.to_string())?;
-    }
-    Ok(())
-}
-
-#[tauri::command]
-async fn show_about(
-    licenses: String,
-    state: tauri::State<'_, Mutex<Option<BrowserWebview>>>,
-) -> Result<(), String> {
-    // Build a JS string literal from the licenses text, escaping special chars.
-    let mut escaped = String::with_capacity(licenses.len() + 2);
-    escaped.push('\'');
-    for ch in licenses.chars() {
-        match ch {
-            '\\' => escaped.push_str("\\\\"),
-            '\'' => escaped.push_str("\\'"),
-            '\n' => escaped.push_str("\\n"),
-            '\r' => {}
-            _ => escaped.push(ch),
-        }
-    }
-    escaped.push('\'');
-
-    let script = format!(
-        "{}\n{}",
-        include_str!("../overlays/shared.js"),
-        include_str!("../overlays/about.js").replace("__LICENSES__", &escaped)
-    );
-
-    let guard = state.lock().unwrap();
-    if let Some(bv) = guard.as_ref() {
-        bv.0.eval(&script).map_err(|e| e.to_string())?;
-    }
     Ok(())
 }
 
@@ -264,30 +223,23 @@ pub fn run() {
             .initialization_script_for_all_frames(init_script)
             .devtools(true)
             .on_navigation(move |url| {
-                // Intercept internal commands from browser overlays
+                // Intercept page-title readback (read-only, no nonce needed)
                 if url.host_str() == Some("xrview.internal") {
-                    let params: std::collections::HashMap<String, String> =
-                        url.query_pairs()
-                            .map(|(k, v)| (k.to_string(), v.to_string()))
-                            .collect();
-                    match url.path() {
-                        "/save-bookmark" => {
-                            let _ = app_handle.emit("bookmark-edited", params);
-                        }
-                        "/delete-bookmark" => {
-                            let _ = app_handle.emit("bookmark-deleted", params);
-                        }
-                        "/page-title" => {
-                            let _ = app_handle.emit("page-title", params);
-                        }
-                        _ => {}
+                    if url.path() == "/page-title" {
+                        let title = url.query_pairs()
+                            .find(|(k, _)| k == "t")
+                            .map(|(_, v)| v.to_string())
+                            .unwrap_or_default();
+                        let _ = app_handle.emit("page-title", title);
                     }
                     return false;
                 }
+                // Block non-HTTP(S) navigations (data:, blob:, javascript:, file:, etc.)
                 let s = url.scheme();
-                if s == "http" || s == "https" {
-                    let _ = app_handle.emit("browser-navigated", url.to_string());
+                if s != "http" && s != "https" {
+                    return false;
                 }
+                let _ = app_handle.emit("browser-navigated", url.to_string());
                 true
             });
 
@@ -300,6 +252,7 @@ pub fn run() {
             // 5. Store handles in managed state
             let state = app.state::<Mutex<Option<BrowserWebview>>>();
             *state.lock().unwrap() = Some(BrowserWebview(browser.clone()));
+            app.manage(ToolbarWebview(toolbar.clone()));
 
             // 6. Resize handler: keep both webviews filling the window
             let browser_clone = browser.clone();
@@ -329,10 +282,8 @@ pub fn run() {
             go_forward,
             reload,
             get_page_title,
+            set_toolbar_expanded,
             show_bookmark_menu,
-            show_bookmark_editor,
-            show_help,
-            show_about,
             toggle_devtools
         ])
         .on_menu_event(|app, event| {
