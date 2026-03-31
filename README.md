@@ -75,7 +75,7 @@ A bundled initialization script injects the IWER XR emulation runtime into every
 
 Tauri was designed for apps that load **trusted** content.  
 Loading untrusted websites in a webview that has IPC access to native commands would be a security risk because a malicious page could call Rust-side functions.  
-XR View mitigates this by giving the `browser` webview **zero Tauri capabilities**: the `"windows"` array in `src-tauri/capabilities/default.json` lists only `"toolbar"`, so the browser webview has no IPC bridge to exploit.  
+XR View mitigates this by giving the `browser` webview **zero Tauri capabilities**: the `"webviews"` array in `src-tauri/capabilities/default.json` lists only `"toolbar"`, so the browser webview has no IPC bridge to exploit.  
 It's effectively just a raw OS webview.
 
 ### XR Emulation

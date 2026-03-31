@@ -13,6 +13,20 @@ import sceneJson from '@iwer/sem/captures/living_room.json';
 // (suppresses its internal check for a native xr object)
 (window as any).CustomWebXRPolyfill = true;
 
+// Capture pristine builtins before page JS can tamper with them.
+// __xrview_getTitle is called by the Rust get_page_title command to safely
+// read document.title using the original encodeURIComponent.
+const _xrviewEnc = encodeURIComponent;
+Object.defineProperty(window, '__xrview_getTitle', {
+    value: () => {
+        window.location.href =
+            'http://xrview.internal/page-title?t=' + _xrviewEnc(document.title || '');
+    },
+    writable: false,
+    configurable: false,
+    enumerable: false,
+});
+
 const xrDevice = new XRDevice(metaQuest3);
 xrDevice.installRuntime();
 xrDevice.installDevUI(DevUI);

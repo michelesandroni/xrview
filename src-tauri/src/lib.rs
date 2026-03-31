@@ -1,4 +1,3 @@
-use std::sync::Mutex;
 use tauri::menu::{ContextMenu, Menu, MenuItem};
 use tauri::webview::WebviewBuilder;
 use tauri::window::WindowBuilder;
@@ -10,26 +9,13 @@ const TOOLBAR_HEIGHT: f64 = 50.0;
 const INITIAL_WIDTH: f64 = 1280.0;
 const INITIAL_HEIGHT: f64 = 800.0;
 
-/// Holds the browser webview handle so commands can drive it.
-struct BrowserWebview(pub tauri::webview::Webview);
-
-unsafe impl Send for BrowserWebview {}
-unsafe impl Sync for BrowserWebview {}
-
-/// Holds the toolbar webview handle for resizing.
-struct ToolbarWebview(pub tauri::webview::Webview);
-
-unsafe impl Send for ToolbarWebview {}
-unsafe impl Sync for ToolbarWebview {}
-
 // ── Tauri commands ────────────────────────────────────────────────────────────
 
 #[tauri::command]
-async fn navigate(
-    url: String,
-    state: tauri::State<'_, Mutex<Option<BrowserWebview>>>,
-) -> Result<(), String> {
-    let normalized = if url.starts_with("http://") || url.starts_with("https://") {
+fn navigate(url: String, app: tauri::AppHandle) -> Result<(), String> {
+    let normalized = if url.get(..7).is_some_and(|p| p.eq_ignore_ascii_case("http://"))
+        || url.get(..8).is_some_and(|p| p.eq_ignore_ascii_case("https://"))
+    {
         url
     } else {
         format!("https://{}", url)
@@ -37,60 +23,55 @@ async fn navigate(
     let parsed = normalized
         .parse::<tauri::Url>()
         .map_err(|e| e.to_string())?;
-    let guard = state.lock().unwrap();
-    if let Some(bv) = guard.as_ref() {
-        bv.0.navigate(parsed).map_err(|e| e.to_string())?;
+    let scheme = parsed.scheme();
+    if scheme != "http" && scheme != "https" {
+        return Err(format!("blocked scheme: {}", scheme));
+    }
+    if let Some(browser) = app.get_webview("browser") {
+        browser.navigate(parsed).map_err(|e| e.to_string())?;
     }
     Ok(())
 }
 
 #[tauri::command]
-async fn go_back(state: tauri::State<'_, Mutex<Option<BrowserWebview>>>) -> Result<(), String> {
-    let guard = state.lock().unwrap();
-    if let Some(bv) = guard.as_ref() {
-        bv.0.eval("history.back()").map_err(|e| e.to_string())?;
+fn go_back(app: tauri::AppHandle) -> Result<(), String> {
+    if let Some(browser) = app.get_webview("browser") {
+        browser.eval("history.back()").map_err(|e| e.to_string())?;
     }
     Ok(())
 }
 
 #[tauri::command]
-async fn go_forward(state: tauri::State<'_, Mutex<Option<BrowserWebview>>>) -> Result<(), String> {
-    let guard = state.lock().unwrap();
-    if let Some(bv) = guard.as_ref() {
-        bv.0.eval("history.forward()").map_err(|e| e.to_string())?;
+fn go_forward(app: tauri::AppHandle) -> Result<(), String> {
+    if let Some(browser) = app.get_webview("browser") {
+        browser.eval("history.forward()").map_err(|e| e.to_string())?;
     }
     Ok(())
 }
 
 #[tauri::command]
-async fn reload(state: tauri::State<'_, Mutex<Option<BrowserWebview>>>) -> Result<(), String> {
-    let guard = state.lock().unwrap();
-    if let Some(bv) = guard.as_ref() {
-        bv.0.reload().map_err(|e| e.to_string())?;
+fn reload(app: tauri::AppHandle) -> Result<(), String> {
+    if let Some(browser) = app.get_webview("browser") {
+        browser.reload().map_err(|e| e.to_string())?;
     }
     Ok(())
 }
 
 #[tauri::command]
-async fn get_page_title(
-    state: tauri::State<'_, Mutex<Option<BrowserWebview>>>,
-) -> Result<(), String> {
-    let guard = state.lock().unwrap();
-    if let Some(bv) = guard.as_ref() {
-        bv.0.eval(
-            "window.location.href='http://xrview.internal/page-title?t='+encodeURIComponent(document.title||'')"
+fn get_page_title(app: tauri::AppHandle) -> Result<(), String> {
+    if let Some(browser) = app.get_webview("browser") {
+        // Uses __xrview_getTitle defined in the init script, which captures
+        // pristine encodeURIComponent before page JS can tamper with it.
+        browser.eval(
+            "typeof __xrview_getTitle==='function'&&__xrview_getTitle()"
         ).map_err(|e| e.to_string())?;
     }
     Ok(())
 }
 
 #[tauri::command]
-async fn set_toolbar_expanded(
-    expanded: bool,
-    app: tauri::AppHandle,
-) -> Result<(), String> {
-    let toolbar = app.state::<ToolbarWebview>();
-    let browser = app.state::<Mutex<Option<BrowserWebview>>>();
+fn set_toolbar_expanded(expanded: bool, app: tauri::AppHandle) -> Result<(), String> {
+    let toolbar = app.get_webview("toolbar").ok_or("toolbar not found")?;
     let win = app.get_window("main").ok_or("window not found")?;
     let scale = win.scale_factor().unwrap_or(1.0);
     let phys = win.inner_size().map_err(|e| e.to_string())?;
@@ -99,26 +80,24 @@ async fn set_toolbar_expanded(
 
     if expanded {
         // Toolbar takes full window, browser is hidden (zero height)
-        toolbar.0.set_bounds(Rect {
+        toolbar.set_bounds(Rect {
             position: Position::Logical(LogicalPosition::new(0.0, 0.0)),
             size: Size::Logical(LogicalSize::new(lw, lh)),
         }).map_err(|e| e.to_string())?;
-        let guard = browser.lock().unwrap();
-        if let Some(bv) = guard.as_ref() {
-            bv.0.set_bounds(Rect {
+        if let Some(browser) = app.get_webview("browser") {
+            browser.set_bounds(Rect {
                 position: Position::Logical(LogicalPosition::new(0.0, lh)),
                 size: Size::Logical(LogicalSize::new(lw, 0.0)),
             }).map_err(|e| e.to_string())?;
         }
     } else {
         // Restore normal layout
-        toolbar.0.set_bounds(Rect {
+        toolbar.set_bounds(Rect {
             position: Position::Logical(LogicalPosition::new(0.0, 0.0)),
             size: Size::Logical(LogicalSize::new(lw, TOOLBAR_HEIGHT)),
         }).map_err(|e| e.to_string())?;
-        let guard = browser.lock().unwrap();
-        if let Some(bv) = guard.as_ref() {
-            bv.0.set_bounds(Rect {
+        if let Some(browser) = app.get_webview("browser") {
+            browser.set_bounds(Rect {
                 position: Position::Logical(LogicalPosition::new(0.0, TOOLBAR_HEIGHT)),
                 size: Size::Logical(LogicalSize::new(lw, lh - TOOLBAR_HEIGHT)),
             }).map_err(|e| e.to_string())?;
@@ -168,15 +147,12 @@ async fn show_bookmark_menu(
 }
 
 #[tauri::command]
-async fn toggle_devtools(
-    state: tauri::State<'_, Mutex<Option<BrowserWebview>>>,
-) -> Result<(), String> {
-    let guard = state.lock().unwrap();
-    if let Some(bv) = guard.as_ref() {
-        if bv.0.is_devtools_open() {
-            bv.0.close_devtools();
+fn toggle_devtools(app: tauri::AppHandle) -> Result<(), String> {
+    if let Some(browser) = app.get_webview("browser") {
+        if browser.is_devtools_open() {
+            browser.close_devtools();
         } else {
-            bv.0.open_devtools();
+            browser.open_devtools();
         }
     }
     Ok(())
@@ -188,7 +164,6 @@ async fn toggle_devtools(
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_store::Builder::default().build())
-        .manage(Mutex::new(None::<BrowserWebview>))
         .setup(|app| {
             // 1. Create the OS window (no default webview)
             let win = WindowBuilder::new(app, "main")
@@ -223,7 +198,14 @@ pub fn run() {
             .initialization_script_for_all_frames(init_script)
             .devtools(true)
             .on_navigation(move |url| {
-                // Intercept page-title readback (read-only, no nonce needed)
+                // Block non-HTTP(S) schemes first (javascript:, data:, blob:, file:, etc.)
+                // This MUST come before the host check so that crafted URLs like
+                // data://xrview.internal/... cannot reach the internal route handler.
+                let s = url.scheme();
+                if s != "http" && s != "https" {
+                    return false;
+                }
+                // Intercept internal page-title readback
                 if url.host_str() == Some("xrview.internal") {
                     if url.path() == "/page-title" {
                         let title = url.query_pairs()
@@ -232,11 +214,6 @@ pub fn run() {
                             .unwrap_or_default();
                         let _ = app_handle.emit("page-title", title);
                     }
-                    return false;
-                }
-                // Block non-HTTP(S) navigations (data:, blob:, javascript:, file:, etc.)
-                let s = url.scheme();
-                if s != "http" && s != "https" {
                     return false;
                 }
                 let _ = app_handle.emit("browser-navigated", url.to_string());
@@ -249,14 +226,10 @@ pub fn run() {
                 LogicalSize::new(INITIAL_WIDTH, INITIAL_HEIGHT - TOOLBAR_HEIGHT),
             )?;
 
-            // 5. Store handles in managed state
-            let state = app.state::<Mutex<Option<BrowserWebview>>>();
-            *state.lock().unwrap() = Some(BrowserWebview(browser.clone()));
-            app.manage(ToolbarWebview(toolbar.clone()));
-
-            // 6. Resize handler: keep both webviews filling the window
-            let browser_clone = browser.clone();
-            let toolbar_clone = toolbar.clone();
+            // 5. Resize handler: keep both webviews filling the window
+            //    (commands look them up via app.get_webview() instead)
+            let browser_clone = browser;
+            let toolbar_clone = toolbar;
             win.on_window_event(move |event| {
                 if let WindowEvent::Resized(phys) = event {
                     let scale = browser_clone.window().scale_factor().unwrap_or(1.0);
