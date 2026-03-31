@@ -1,0 +1,26 @@
+{
+  "@bufbuild/protobuf@2.11.0": {
+    "licenseFile": false
+  },
+  "@esbuild/win32-x64@0.27.4": {
+    "licenseFile": false
+  },
+  "@radix-ui/react-compose-refs@1.1.2": {
+    "licenseFile": false
+  },
+  "@radix-ui/react-use-callback-ref@1.1.1": {
+    "licenseFile": false
+  },
+  "@radix-ui/react-use-layout-effect@1.1.1": {
+    "licenseFile": false
+  },
+  "eastasianwidth@0.2.0": {
+    "licenseFile": false
+  },
+  "input-otp@1.4.2": {
+    "licenseFile": false
+  },
+  "nosleep.js@0.7.0": {
+    "licenseFile": false
+  }
+}
