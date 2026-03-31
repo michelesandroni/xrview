@@ -1,6 +1,6 @@
 # XR View
 
-![XRView](src-tauri\icons\128x128.png)
+![XRView](src-tauri/icons/128x128.png)
 
 A WebXR emulator for the desktop. Navigate any WebXR app, no headset or extensions required.
 
