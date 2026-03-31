@@ -1,15 +1,16 @@
 {
   "name": "xrview",
   "version": "0.9.0",
-  "license": "MIT",
   "type": "module",
+  "author": "michelesandroni",
+  "repository": "https://github.com/michelesandroni/xrview",
+  "license": "MIT",
   "scripts": {
     "dev": "vite",
     "build-xr": "node scripts/build-xr.mjs",
     "tauri": "npm run build-xr && tauri",
     "tauri-build": "npm run build-xr && tauri build -- --target-dir ../dist-release",
     "tauri-dev": "npm run build-xr && tauri dev -- --target-dir ../dist-debug",
-    "--DO-NOT-USE--preview": "vite preview",
     "build": "tsc && vite build",
     "build-icons": "npm run tauri icon"
   },

@@ -52,7 +52,7 @@ The app is built with [Tauri v2](https://tauri.app/) (Rust backend + React front
 │  OS Window ("main")                            │
 │ ┌────────────────────────────────────────────┐ │
 │ │  toolbar webview  (React SPA, 50px)        │ │
-│ │  URL bar · nav buttons · bookmarks · info  │ │
+│ │  URL bar + nav buttons + bookmarks + info  │ │
 │ ├────────────────────────────────────────────┤ │
 │ │                                            │ │
 │ │  browser webview  (external URLs)          │ │
@@ -65,11 +65,13 @@ The app is built with [Tauri v2](https://tauri.app/) (Rust backend + React front
 **Two webviews, different trust levels:**
 
 - **`toolbar`** = Loads the local React SPA.  
-This is the *only* webview with Tauri IPC access (defined in `src-tauri/capabilities/default.json`). It invokes Rust commands like `navigate`, `go_back`, `reload`, etc.
+This is the *only* webview with Tauri IPC access (defined in `src-tauri/capabilities/default.json`).  
+It invokes Rust commands like `navigate`, `go_back`, `reload`, etc.
 - **`browser`** = Loads arbitrary external URLs.  
 Has **zero** Tauri capabilities.  
 It's a plain OS webview (WebView2 on Windows, WebKit on macOS/Linux).  
-A bundled initialization script injects the IWER XR emulation runtime into every page, providing `navigator.xr` and emulated controllers. DevTools are enabled even in release builds (right-click → Inspect).
+A bundled initialization script injects the IWER XR emulation runtime into every page, providing `navigator.xr` and emulated controllers.  
+DevTools are enabled even in release builds (right-click → Inspect).
 
 ### Security: why the browser webview has no capabilities
 
