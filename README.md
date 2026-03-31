@@ -18,6 +18,8 @@ The author(s) make no guarantees about security, stability, or fitness for any p
 
 See the [LICENSE](LICENSE) file for terms.
 
+![XRView](screenshot.jpg)
+
 ## Why This Exists
 
 Chrome's [Immersive Web Emulator](https://chromewebstore.google.com/detail/immersive-web-emulator/cgffilbpcibhmcfbgggfhfolhkfbhmik) Extension (also built by Meta, the same team behind IWER) is the standard way to develop WebXR on desktop. However:
