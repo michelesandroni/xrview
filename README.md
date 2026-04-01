@@ -8,11 +8,10 @@ Run any WebXR application locally with emulated VR hardware (Meta Quest 3 by def
 
 ## ⚠ Disclaimer
 
-**Use at your own risk.**
 
 ```
-This is an experimental developer tool, not a general-purpose web browser.
-It loads untrusted web content in an OS webview.
+This is a development tool, not a general-purpose web browser.
+Use at your own risk. It loads untrusted web content in an OS webview.
 The author(s) make no guarantees about security, stability, or fitness for any particular purpose.
 ```
 
@@ -22,13 +21,11 @@ See the [LICENSE](LICENSE) file for terms.
 
 ## Why This Exists
 
-Chrome's [Immersive Web Emulator](https://chromewebstore.google.com/detail/immersive-web-emulator/cgffilbpcibhmcfbgggfhfolhkfbhmik) Extension (also built by Meta, the same team behind IWER) is the standard way to develop WebXR on desktop. However:
+Chrome's [Immersive Web Emulator](https://chromewebstore.google.com/detail/immersive-web-emulator/cgffilbpcibhmcfbgggfhfolhkfbhmik) Extension (also built by Meta, the same team behind IWER) is the standard way to develop WebXR on desktop.
 
-- **Corporate environments often disable browser extensions** via admin policies, leaving you with no XR emulator at all.
-- **The Chrome extension runs inside DevTools**, which takes screen space away from the actual 3D scene, painful on small laptop screens.
-- **The Chrome extension does not support walking** (Shift + WASD locomotion). IWER does, and XR View inherits that since it uses the same underlying runtime.
+My corporate environment disables all Chrome extensions and the entire Chrome Web Store via admin policies, which means Meta's Immersive Web Emulator is completely unavailable to me, so I built a standalone alternative using the same runtime.
 
-XR View solves all three: it's a standalone app that needs no extensions, renders the XR controls in the same window as the content, and supports full walk-mode emulation out of the box.
+XR View is a standalone application that needs no extensions, renders the XR controls in the same window as the content, and supports walking emulation (Shift + WASD locomotion) out of the box because it uses the IWER runtime.
 
 ## XR Controls
 
